@@ -1,200 +1,214 @@
 #include <Arduino.h>
 #include <TMCStepper.h>
 
+// UART
+#define TX_PIN 17
+#define RX_PIN 16
+
+// Moteur 1 - Gauche
+#define M1_DIR_PIN 4
+#define M1_STEP_PIN 33
+#define M1_ENABLE_PIN 14
+
+// Moteur 2 - Droite
+#define M2_DIR_PIN 16
+#define M2_STEP_PIN 32
+#define M2_ENABLE_PIN 27
+
 // Paramètres moteurs
 #define R_SENSE 0.11f
-#define CURRENT 800
+#define CURRENT 600 // mA
 
-// UART
-#define TX_PIN1 17
-#define RX_PIN1 16
+// UART (bus unique)
+HardwareSerial TMCSerial(1);
 
-// Moteur 1 - Avant gauche
-#define DIR_PIN1 4
-#define STEP_PIN1 33
+// Adresses des drivers TMC2209
+#define DRIVER1_ADDR 0b00
+#define DRIVER2_ADDR 0b01
 
-// Moteur 2 - Avant droite
-#define DIR_PIN2 16
-#define STEP_PIN2 32
+TMC2209Stepper driver1(&TMCSerial, R_SENSE, DRIVER1_ADDR);
+TMC2209Stepper driver2(&TMCSerial, R_SENSE, DRIVER2_ADDR);
 
-// Moteur 3 - Arrière
-#define DIR_PIN3 2
-#define STEP_PIN3 13
+volatile int32_t speed1_steps_per_sec = 0; // target speed (signed)
+volatile int32_t speed2_steps_per_sec = 0;
+uint32_t last_step_time1 = 0;
+uint32_t last_step_time2 = 0;
 
-TMC2209Stepper driver1(&Serial1, R_SENSE, 0b00);
-TMC2209Stepper driver2(&Serial1, R_SENSE, 0b01);
-TMC2209Stepper driver3(&Serial1, R_SENSE, 0b10);
-
-// Moteur state
-enum MovementState
+void enableDrivers()
 {
-  STOP,
-  FORWARD,
-  BACKWARD,
-  LEFT,
-  RIGHT
-};
-
-MovementState currentState = STOP;
-
-unsigned long lastStepTime = 0;
-const int stepDelay = 800; // microsecondes entre les pas
-int stepsRemaining = 0;
-
-struct Motor
-{
-  int stepPin;
-  int dirPin;
-  bool dir;
-  bool enabled;
-  Motor(int s, int d, bool direction, bool en = false)
-      : stepPin(s), dirPin(d), dir(direction), enabled(en) {}
-};
-
-Motor motors[3] = {
-    Motor(STEP_PIN1, DIR_PIN1, true),
-    Motor(STEP_PIN2, DIR_PIN2, true),
-    Motor(STEP_PIN3, DIR_PIN3, true),
-};
-
-void setupMotors()
-{
-  for (int i = 0; i < 3; i++)
-  {
-    pinMode(motors[i].stepPin, OUTPUT);
-    pinMode(motors[i].dirPin, OUTPUT);
-  }
-
-  Serial1.begin(115200, SERIAL_8N1, RX_PIN1, TX_PIN1);
-
-  driver1.begin();
-  driver1.rms_current(CURRENT);
-  driver1.microsteps(16);
-  driver1.en_spreadCycle(false);
-  driver1.pdn_disable(true);
-  driver2.begin();
-  driver2.rms_current(CURRENT);
-  driver2.microsteps(16);
-  driver2.en_spreadCycle(false);
-  driver2.pdn_disable(true);
-  driver3.begin();
-  driver3.rms_current(CURRENT);
-  driver3.microsteps(16);
-  driver3.en_spreadCycle(false);
-  driver3.pdn_disable(true);
+  digitalWrite(M1_ENABLE_PIN, LOW); // LOW pour activer le driver
+  digitalWrite(M2_ENABLE_PIN, LOW);
 }
 
-void applyDirection()
+void disableDrivers()
 {
-  for (int i = 0; i < 3; i++)
-  {
-    digitalWrite(motors[i].dirPin, motors[i].dir);
-  }
+  digitalWrite(M1_ENABLE_PIN, HIGH);
+  digitalWrite(M2_ENABLE_PIN, HIGH);
 }
 
-void setMovement(MovementState state, int steps = 400)
+// Non-blocking stepper update function
+void updateSteppers()
 {
-  currentState = state;
-  stepsRemaining = steps;
-
-  switch (state)
+  uint32_t now = micros();
+  // Moteur 1
+  if (speed1_steps_per_sec != 0)
   {
-  case FORWARD:
-    motors[0].dir = true;
-    motors[1].dir = true;
-    motors[2].dir = true;
-    motors[0].enabled = motors[1].enabled = motors[2].enabled = true;
-    break;
-  case BACKWARD:
-    motors[0].dir = false;
-    motors[1].dir = false;
-    motors[2].dir = false;
-    motors[0].enabled = motors[1].enabled = motors[2].enabled = true;
-    break;
-  case LEFT:
-    motors[0].dir = false;
-    motors[1].dir = true;
-    motors[2].enabled = false;
-    motors[0].enabled = motors[1].enabled = true;
-    break;
-  case RIGHT:
-    motors[0].dir = true;
-    motors[1].dir = false;
-    motors[2].enabled = false;
-    motors[0].enabled = motors[1].enabled = true;
-    break;
-  case STOP:
-  default:
-    motors[0].enabled = motors[1].enabled = motors[2].enabled = false;
-    break;
-  }
-
-  applyDirection();
-}
-
-void updateMotors()
-{
-  static bool stepState = false;
-
-  if (stepsRemaining <= 0)
-  {
-    setMovement(STOP);
-    return;
-  }
-
-  unsigned long now = micros();
-  if (now - lastStepTime >= stepDelay)
-  {
-    stepState = !stepState;
-    lastStepTime = now;
-
-    for (int i = 0; i < 3; i++)
+    uint32_t interval = 1000000UL / abs(speed1_steps_per_sec);
+    if (now - last_step_time1 >= interval)
     {
-      if (motors[i].enabled)
-      {
-        digitalWrite(motors[i].stepPin, stepState ? HIGH : LOW);
-      }
+      digitalWrite(M1_STEP_PIN, HIGH);
+      delayMicroseconds(2);
+      digitalWrite(M1_STEP_PIN, LOW);
+      last_step_time1 = now;
     }
-
-    if (!stepState)
-      stepsRemaining--; // Compte les pas complets
   }
+  // Moteur 2
+  if (speed2_steps_per_sec != 0)
+  {
+    uint32_t interval = 1000000UL / abs(speed2_steps_per_sec);
+    if (now - last_step_time2 >= interval)
+    {
+      digitalWrite(M2_STEP_PIN, HIGH);
+      delayMicroseconds(2);
+      digitalWrite(M2_STEP_PIN, LOW);
+      last_step_time2 = now;
+    }
+  }
+}
+
+// En avant
+void forward(int32_t speed)
+{
+  digitalWrite(M1_DIR_PIN, HIGH);
+  digitalWrite(M2_DIR_PIN, HIGH);
+  speed1_steps_per_sec = speed;
+  speed2_steps_per_sec = speed;
+}
+
+// En arrière
+void backward(int32_t speed)
+{
+  digitalWrite(M1_DIR_PIN, LOW);
+  digitalWrite(M2_DIR_PIN, LOW);
+  speed1_steps_per_sec = speed;
+  speed2_steps_per_sec = speed;
+}
+
+// Rotation à gauche
+void turnLeft(int32_t speed)
+{
+  digitalWrite(M1_DIR_PIN, LOW);
+  digitalWrite(M2_DIR_PIN, HIGH);
+  speed1_steps_per_sec = speed;
+  speed2_steps_per_sec = speed;
+}
+
+// Rotation à droite
+void turnRight(int32_t speed)
+{
+  digitalWrite(M1_DIR_PIN, HIGH);
+  digitalWrite(M2_DIR_PIN, LOW);
+  speed1_steps_per_sec = speed;
+  speed2_steps_per_sec = speed;
+}
+
+// Arrêt des moteurs
+void stopMotors()
+{
+  speed1_steps_per_sec = 0;
+  speed2_steps_per_sec = 0;
+}
+
+// Vérifie si les moteurs sont en mouvement
+bool isMoving()
+{
+  return (speed1_steps_per_sec != 0 || speed2_steps_per_sec != 0);
+}
+
+// Capteur à ultrasons
+const int obstacleCheckInterval = 100; // ms between distance checks
+unsigned long lastObstacleCheckTime = 0;
+const int obstacleThresholdCM = 20; // stop if closer than 20 cm
+
+#define TRIG_PIN 18
+#define ECHO_PIN 5
+
+long readDistanceCM()
+{
+  digitalWrite(TRIG_PIN, LOW);
+  delayMicroseconds(2);
+  digitalWrite(TRIG_PIN, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(TRIG_PIN, LOW);
+  long duration = pulseIn(ECHO_PIN, HIGH, 20000); // timeout 20 ms
+  long distance = duration * 0.034 / 2;
+  return distance;
 }
 
 void setup()
 {
   Serial.begin(115200);
-  setupMotors();
-  Serial.println("Moteurs prêts.");
+  TMCSerial.begin(115200, SERIAL_8N1, RX_PIN, TX_PIN);
+
+  pinMode(M1_STEP_PIN, OUTPUT);
+  pinMode(M1_DIR_PIN, OUTPUT);
+  pinMode(M1_ENABLE_PIN, OUTPUT);
+  pinMode(M2_STEP_PIN, OUTPUT);
+  pinMode(M2_DIR_PIN, OUTPUT);
+  pinMode(M2_ENABLE_PIN, OUTPUT);
+  // Capteur à ultrasons
+  pinMode(TRIG_PIN, OUTPUT);
+  pinMode(ECHO_PIN, INPUT);
+
+  digitalWrite(M1_ENABLE_PIN, LOW);
+  digitalWrite(M2_ENABLE_PIN, LOW);
+
+  driver1.begin();
+  driver2.begin();
+
+  driver1.rms_current(CURRENT);
+  driver2.rms_current(CURRENT);
+
+  driver1.microsteps(16);
+  driver2.microsteps(16);
+
+  driver1.en_spreadCycle(false);
+  driver2.en_spreadCycle(false);
+
+  stopMotors();
+  forward(200); // Move forward at 200 steps/sec
+  Serial.println("Setup complete");
 }
 
 void loop()
 {
-  updateMotors();
+  updateSteppers(); // Mise à jour des moteurs asynchrone
 
-  // Exemple : déclencher des mouvements toutes les 4 secondes
-  static unsigned long lastAction = 0;
-  static int actionIndex = 0;
+  // On vérifie les obstacles
   unsigned long now = millis();
-
-  if (now - lastAction > 4000 && currentState == STOP)
+  if (now - lastObstacleCheckTime >= obstacleCheckInterval)
   {
-    switch (actionIndex)
+    lastObstacleCheckTime = now;
+
+    long distance = readDistanceCM();
+
+    if (distance > 0 && distance < obstacleThresholdCM)
     {
-    case 0:
-      setMovement(FORWARD);
-      break;
-    case 1:
-      setMovement(BACKWARD);
-      break;
-    case 2:
-      setMovement(LEFT);
-      break;
-    case 3:
-      setMovement(RIGHT);
-      break;
+      if (isMoving())
+      {
+        stopMotors();
+        Serial.println("Obstacle detected: Stopped");
+      }
     }
-    actionIndex = (actionIndex + 1) % 4;
-    lastAction = now;
+    else
+    {
+      if (!isMoving())
+      {
+        forward(200);
+        Serial.println("Path clear: Moving forward");
+      }
+    }
   }
+
+  // Later: integrate sensors and controller commands here
 }

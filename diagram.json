@@ -28,21 +28,6 @@
 		},
 		{
 			"type": "wokwi-a4988",
-			"id": "drv2",
-			"top": 91.4,
-			"left": -33.2,
-			"rotate": 270,
-			"attrs": {}
-		},
-		{
-			"type": "wokwi-stepper-motor",
-			"id": "stepper2",
-			"top": -140.39,
-			"left": -85.97,
-			"attrs": { "size": "17" }
-		},
-		{
-			"type": "wokwi-a4988",
 			"id": "drv3",
 			"top": 91.4,
 			"left": -378.8,
@@ -55,6 +40,13 @@
 			"top": -140.39,
 			"left": -431.57,
 			"attrs": { "size": "17" }
+		},
+		{
+			"type": "wokwi-hc-sr04",
+			"id": "ultrasonic1",
+			"top": 203.1,
+			"left": -71.3,
+			"attrs": {}
 		}
 	],
 	"connections": [
@@ -64,10 +56,6 @@
 		["drv1:1A", "stepper1:B+", "green", ["v0"]],
 		["drv1:2A", "stepper1:A+", "green", ["v0"]],
 		["drv1:2B", "stepper1:A-", "green", ["v0"]],
-		["drv2:1B", "stepper2:B-", "green", ["v0"]],
-		["drv2:1A", "stepper2:B+", "green", ["v0"]],
-		["drv2:2A", "stepper2:A+", "green", ["v0"]],
-		["drv2:2B", "stepper2:A-", "green", ["v0"]],
 		["drv3:1B", "stepper3:B-", "green", ["v0"]],
 		["drv3:1A", "stepper3:B+", "green", ["v0"]],
 		["drv3:2A", "stepper3:A+", "green", ["v0"]],
@@ -75,15 +63,13 @@
 		["drv3:STEP", "esp:33", "gold", ["v28.8", "h86.4"]],
 		["drv1:STEP", "esp:32", "gold", ["v28.8", "h-38.4"]],
 		["drv1:SLEEP", "drv1:RESET", "green", ["v9.6", "h-9.6", "v9.6"]],
-		["drv2:RESET", "drv2:SLEEP", "green", ["v9.6", "h9.6"]],
 		["drv3:RESET", "drv3:SLEEP", "green", ["v9.6", "h9.6"]],
 		["esp:14", "drv3:ENABLE", "green", ["v-19.05", "h-124.8"]],
 		["esp:27", "drv1:ENABLE", "green", ["v0"]],
-		["esp:26", "drv2:ENABLE", "green", ["v-28.65", "h144"]],
 		["esp:16", "drv1:DIR", "blue", ["v9.6", "h144"]],
 		["esp:4", "drv3:DIR", "blue", ["v19.2", "h-57.6", "v-201.6"]],
-		["drv2:DIR", "esp:2", "blue", ["v211.2", "h-288"]],
-		["drv2:STEP", "esp:13", "gold", ["v76.8", "h-105.6"]]
+		["ultrasonic1:TRIG", "esp:18", "violet", ["v76.8", "h-221.2"]],
+		["ultrasonic1:ECHO", "esp:5", "violet", ["v86.4", "h-240.8"]]
 	],
 	"dependencies": {}
 }
