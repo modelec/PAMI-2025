@@ -1,30 +1,9 @@
 #include <Arduino.h>
 #include <TMCStepper.h>
-
-// UART
-#define TX_PIN 17
-#define RX_PIN 16
-
-// Moteur 1 - Gauche
-#define M1_DIR_PIN 4
-#define M1_STEP_PIN 33
-#define M1_ENABLE_PIN 14
-
-// Moteur 2 - Droite
-#define M2_DIR_PIN 16
-#define M2_STEP_PIN 32
-#define M2_ENABLE_PIN 27
-
-// Paramètres moteurs
-#define R_SENSE 0.11f
-#define CURRENT 600 // mA
+#include "main.h"
 
 // UART (bus unique)
 HardwareSerial TMCSerial(1);
-
-// Adresses des drivers TMC2209
-#define DRIVER1_ADDR 0b00
-#define DRIVER2_ADDR 0b01
 
 TMC2209Stepper driver1(&TMCSerial, R_SENSE, DRIVER1_ADDR);
 TMC2209Stepper driver2(&TMCSerial, R_SENSE, DRIVER2_ADDR);
@@ -33,6 +12,10 @@ volatile int32_t speed1_steps_per_sec = 0; // target speed (signed)
 volatile int32_t speed2_steps_per_sec = 0;
 uint32_t last_step_time1 = 0;
 uint32_t last_step_time2 = 0;
+
+// Pour le redémarrage des moteurs après capteur obstacle
+Direction lastDirection = STOP;
+volatile int32_t lastSpeed = 0;
 
 void enableDrivers()
 {
@@ -81,6 +64,7 @@ void forward(int32_t speed)
 {
   digitalWrite(M1_DIR_PIN, HIGH);
   digitalWrite(M2_DIR_PIN, HIGH);
+  lastDirection = FORWARD;
   speed1_steps_per_sec = speed;
   speed2_steps_per_sec = speed;
 }
@@ -90,6 +74,7 @@ void backward(int32_t speed)
 {
   digitalWrite(M1_DIR_PIN, LOW);
   digitalWrite(M2_DIR_PIN, LOW);
+  lastDirection = BACKWARD;
   speed1_steps_per_sec = speed;
   speed2_steps_per_sec = speed;
 }
@@ -99,6 +84,7 @@ void turnLeft(int32_t speed)
 {
   digitalWrite(M1_DIR_PIN, LOW);
   digitalWrite(M2_DIR_PIN, HIGH);
+  lastDirection = LEFT;
   speed1_steps_per_sec = speed;
   speed2_steps_per_sec = speed;
 }
@@ -108,6 +94,7 @@ void turnRight(int32_t speed)
 {
   digitalWrite(M1_DIR_PIN, HIGH);
   digitalWrite(M2_DIR_PIN, LOW);
+  lastDirection = RIGHT;
   speed1_steps_per_sec = speed;
   speed2_steps_per_sec = speed;
 }
@@ -130,9 +117,6 @@ const int obstacleCheckInterval = 100; // ms between distance checks
 unsigned long lastObstacleCheckTime = 0;
 const int obstacleThresholdCM = 20; // stop if closer than 20 cm
 
-#define TRIG_PIN 18
-#define ECHO_PIN 5
-
 long readDistanceCM()
 {
   digitalWrite(TRIG_PIN, LOW);
@@ -143,6 +127,52 @@ long readDistanceCM()
   long duration = pulseIn(ECHO_PIN, HIGH, 20000); // timeout 20 ms
   long distance = duration * 0.034 / 2;
   return distance;
+}
+
+void detectObstacles()
+{
+  // On vérifie les obstacles
+  unsigned long now = millis();
+  if (now - lastObstacleCheckTime >= obstacleCheckInterval)
+  {
+    lastObstacleCheckTime = now;
+
+    long distance = readDistanceCM();
+
+    if (distance > 0 && distance < obstacleThresholdCM)
+    {
+      if (isMoving())
+      {
+        lastSpeed = speed1_steps_per_sec;
+        stopMotors();
+        Serial.println("Obstacle detected: Stopped");
+      }
+    }
+    else
+    {
+      if (!isMoving())
+      {
+        switch (lastDirection)
+        {
+        case FORWARD:
+          forward(lastSpeed);
+          break;
+        case BACKWARD:
+          backward(lastSpeed);
+          break;
+        case LEFT:
+          turnLeft(lastSpeed);
+          break;
+        case RIGHT:
+          turnRight(lastSpeed);
+          break;
+        default:
+          break;
+        }
+        Serial.println("Path clear: Resuming movement");
+      }
+    }
+  }
 }
 
 void setup()
@@ -176,7 +206,7 @@ void setup()
   driver2.en_spreadCycle(false);
 
   stopMotors();
-  forward(200); // Move forward at 200 steps/sec
+  turnRight(200); // Move forward at 200 steps/sec
   Serial.println("Setup complete");
 }
 
@@ -184,31 +214,5 @@ void loop()
 {
   updateSteppers(); // Mise à jour des moteurs asynchrone
 
-  // On vérifie les obstacles
-  unsigned long now = millis();
-  if (now - lastObstacleCheckTime >= obstacleCheckInterval)
-  {
-    lastObstacleCheckTime = now;
-
-    long distance = readDistanceCM();
-
-    if (distance > 0 && distance < obstacleThresholdCM)
-    {
-      if (isMoving())
-      {
-        stopMotors();
-        Serial.println("Obstacle detected: Stopped");
-      }
-    }
-    else
-    {
-      if (!isMoving())
-      {
-        forward(200);
-        Serial.println("Path clear: Moving forward");
-      }
-    }
-  }
-
-  // Later: integrate sensors and controller commands here
+  detectObstacles(); // Vérification des obstacles
 }
