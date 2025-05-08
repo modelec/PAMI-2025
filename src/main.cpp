@@ -137,6 +137,12 @@ void detectObstacles()
   {
     lastObstacleCheckTime = now;
 
+    // Si le robot tourne sur lui-même, on ne vérifie pas les obstacles
+    if (lastDirection == RIGHT || lastDirection == LEFT)
+    {
+      return;
+    }
+
     long distance = readDistanceCM();
 
     if (distance > 0 && distance < obstacleThresholdCM)
