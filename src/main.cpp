@@ -8,14 +8,17 @@ HardwareSerial TMCSerial(1);
 TMC2209Stepper driver1(&TMCSerial, R_SENSE, DRIVER1_ADDR);
 TMC2209Stepper driver2(&TMCSerial, R_SENSE, DRIVER2_ADDR);
 
-volatile int32_t speed1_steps_per_sec = 0; // target speed (signed)
-volatile int32_t speed2_steps_per_sec = 0;
-uint32_t last_step_time1 = 0;
-uint32_t last_step_time2 = 0;
+volatile int32_t speed_steps_per_sec = 0; // target speed (signed)
+uint32_t last_step_time = 0;
 
 // Pour le redémarrage des moteurs après capteur obstacle
 Direction lastDirection = STOP;
 volatile int32_t lastSpeed = 0;
+
+volatile int32_t steps_target = 0;
+volatile int32_t steps_done = 0;
+
+bool movementInProgress = false;
 
 void enableDrivers()
 {
@@ -29,87 +32,87 @@ void disableDrivers()
   digitalWrite(M2_ENABLE_PIN, HIGH);
 }
 
+// Arrêt des moteurs
+void stopMotors()
+{
+  speed_steps_per_sec = 0;
+}
+
+void moveAsyncSteps(int32_t steps, int32_t speed, bool forwardDir)
+{
+  // Le nombre de pas à faire
+  steps_target = steps;
+  steps_done = 0;
+
+  // La direction du moteur
+  digitalWrite(M1_DIR_PIN, forwardDir ? HIGH : LOW);
+  digitalWrite(M2_DIR_PIN, forwardDir ? HIGH : LOW);
+
+  speed_steps_per_sec = speed;
+  movementInProgress = true;
+  lastDirection = forwardDir ? FORWARD : BACKWARD;
+}
+void rotateAsync(float angleDeg, int32_t speed, bool toRight)
+{
+  // Informations sur les roues
+  const float wheelBase = 10.0;     // cm
+  const float wheelDiameter = 6.0;  // cm
+  const int stepsPerRev = 200 * 16; // microsteps
+  const float wheelCirc = PI * wheelDiameter;
+
+  float rotationCirc = PI * wheelBase;
+  float distPerWheel = (angleDeg / 360.0) * rotationCirc;
+  int32_t steps = (distPerWheel / wheelCirc) * stepsPerRev;
+
+  // Le nombre de pas à faire
+  steps_target = steps;
+  steps_done = 0;
+
+  // La direction du moteur
+  digitalWrite(M1_DIR_PIN, toRight ? HIGH : LOW);
+  digitalWrite(M2_DIR_PIN, toRight ? LOW : HIGH);
+
+  speed_steps_per_sec = speed;
+  movementInProgress = true;
+  lastDirection = toRight ? RIGHT : LEFT;
+}
+
 // Non-blocking stepper update function
 void updateSteppers()
 {
   uint32_t now = micros();
-  // Moteur 1
-  if (speed1_steps_per_sec != 0)
+
+  // Moteurs
+  if (speed_steps_per_sec != 0 && (steps_done < steps_target))
   {
-    uint32_t interval = 1000000UL / abs(speed1_steps_per_sec);
-    if (now - last_step_time1 >= interval)
+    uint32_t interval = 1000000UL / abs(speed_steps_per_sec);
+    if (now - last_step_time >= interval)
     {
       digitalWrite(M1_STEP_PIN, HIGH);
-      delayMicroseconds(2);
-      digitalWrite(M1_STEP_PIN, LOW);
-      last_step_time1 = now;
-    }
-  }
-  // Moteur 2
-  if (speed2_steps_per_sec != 0)
-  {
-    uint32_t interval = 1000000UL / abs(speed2_steps_per_sec);
-    if (now - last_step_time2 >= interval)
-    {
       digitalWrite(M2_STEP_PIN, HIGH);
       delayMicroseconds(2);
+      digitalWrite(M1_STEP_PIN, LOW);
       digitalWrite(M2_STEP_PIN, LOW);
-      last_step_time2 = now;
+
+      last_step_time = now;
+      steps_done++;
     }
   }
-}
 
-// En avant
-void forward(int32_t speed)
-{
-  digitalWrite(M1_DIR_PIN, HIGH);
-  digitalWrite(M2_DIR_PIN, HIGH);
-  lastDirection = FORWARD;
-  speed1_steps_per_sec = speed;
-  speed2_steps_per_sec = speed;
-}
-
-// En arrière
-void backward(int32_t speed)
-{
-  digitalWrite(M1_DIR_PIN, LOW);
-  digitalWrite(M2_DIR_PIN, LOW);
-  lastDirection = BACKWARD;
-  speed1_steps_per_sec = speed;
-  speed2_steps_per_sec = speed;
-}
-
-// Rotation à gauche
-void turnLeft(int32_t speed)
-{
-  digitalWrite(M1_DIR_PIN, LOW);
-  digitalWrite(M2_DIR_PIN, HIGH);
-  lastDirection = LEFT;
-  speed1_steps_per_sec = speed;
-  speed2_steps_per_sec = speed;
-}
-
-// Rotation à droite
-void turnRight(int32_t speed)
-{
-  digitalWrite(M1_DIR_PIN, HIGH);
-  digitalWrite(M2_DIR_PIN, LOW);
-  lastDirection = RIGHT;
-  speed1_steps_per_sec = speed;
-  speed2_steps_per_sec = speed;
-}
-
-// Arrêt des moteurs
-void stopMotors()
-{
-  speed1_steps_per_sec = 0;
-  speed2_steps_per_sec = 0;
+  // Fin du mouvement ?
+  if (movementInProgress &&
+      steps_done >= steps_target)
+  {
+    stopMotors();
+    movementInProgress = false;
+    Serial.println("Mouvement terminé");
+  }
 }
 
 // Vérifie si les moteurs sont en mouvement
 bool isMoving()
 {
-  return (speed1_steps_per_sec != 0 || speed2_steps_per_sec != 0);
+  return speed_steps_per_sec != 0;
 }
 
 // Capteur à ultrasons
@@ -147,35 +150,31 @@ void detectObstacles()
 
     if (distance > 0 && distance < obstacleThresholdCM)
     {
+      // Si un obstacle est détecté, on arrête le robot
       if (isMoving())
       {
-        lastSpeed = speed1_steps_per_sec;
+        lastSpeed = speed_steps_per_sec;
         stopMotors();
-        Serial.println("Obstacle detected: Stopped");
+        Serial.println("Obstacle détecté : Arrêt");
       }
     }
     else
     {
-      if (!isMoving())
+      // Si le robot est arrêté et qu'il n'y a pas d'obstacle, on reprend le mouvement
+      if (!isMoving() && movementInProgress)
       {
         switch (lastDirection)
         {
         case FORWARD:
-          forward(lastSpeed);
+          moveAsyncSteps(steps_target - steps_done, lastSpeed, true);
           break;
         case BACKWARD:
-          backward(lastSpeed);
-          break;
-        case LEFT:
-          turnLeft(lastSpeed);
-          break;
-        case RIGHT:
-          turnRight(lastSpeed);
+          moveAsyncSteps(steps_target - steps_done, lastSpeed, false);
           break;
         default:
           break;
         }
-        Serial.println("Path clear: Resuming movement");
+        Serial.println("Plus d'obstacle : Reprise du mouvement");
       }
     }
   }
@@ -212,7 +211,7 @@ void setup()
   driver2.en_spreadCycle(false);
 
   stopMotors();
-  turnRight(200); // Move forward at 200 steps/sec
+  moveAsyncSteps(500, 200, false);
   Serial.println("Setup complete");
 }
 
