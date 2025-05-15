@@ -1,5 +1,7 @@
 #include <Arduino.h>
 #include <TMCStepper.h>
+
+// Définitions des constantes dans main.h
 #include "main.h"
 
 // UART (bus unique)
@@ -52,17 +54,15 @@ void moveAsyncSteps(int32_t steps, int32_t speed, bool forwardDir)
   movementInProgress = true;
   lastDirection = forwardDir ? FORWARD : BACKWARD;
 }
+
 void rotateAsync(float angleDeg, int32_t speed, bool toRight)
 {
   // Informations sur les roues
-  const float wheelBase = 10.0;     // cm
-  const float wheelDiameter = 6.0;  // cm
-  const int stepsPerRev = 200 * 16; // microsteps
-  const float wheelCirc = PI * wheelDiameter;
+  const float wheelCirc = PI * WHEEL_DIAMETER;
 
-  float rotationCirc = PI * wheelBase;
+  float rotationCirc = PI * WHEEL_BASE;
   float distPerWheel = (angleDeg / 360.0) * rotationCirc;
-  int32_t steps = (distPerWheel / wheelCirc) * stepsPerRev;
+  int32_t steps = (distPerWheel / wheelCirc) * STEPS_PER_REV;
 
   // Le nombre de pas à faire
   steps_target = steps;
@@ -212,6 +212,7 @@ void setup()
 
   stopMotors();
   moveAsyncSteps(500, 200, false);
+  // rotateAsync(90, 200, true);
   Serial.println("Setup complete");
 }
 

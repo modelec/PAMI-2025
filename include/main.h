@@ -35,4 +35,9 @@ enum Direction
 #define TRIG_PIN 18
 #define ECHO_PIN 5
 
+// Constantes pour les roues
+#define WHEEL_DIAMETER 5.5     // cm
+#define STEPS_PER_REV 200 * 16 // microsteps
+#define WHEEL_BASE 7.2         // cm
+
 #endif // MAIN_H
