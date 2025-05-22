@@ -14,6 +14,17 @@ enum Direction
 #define TX_PIN 17
 #define RX_PIN 16
 
+/* Réel */
+#define M1_DIR_PIN 18
+#define M1_STEP_PIN 22
+#define M1_ENABLE_PIN 32
+
+#define M2_DIR_PIN 19
+#define M2_STEP_PIN 23
+#define M2_ENABLE_PIN 26
+
+/* Simulateur
+
 // Moteur 1 - Gauche
 #define M1_DIR_PIN 4
 #define M1_STEP_PIN 33
@@ -23,6 +34,8 @@ enum Direction
 #define M2_DIR_PIN 16
 #define M2_STEP_PIN 32
 #define M2_ENABLE_PIN 27
+
+*/
 
 // Paramètres moteurs
 #define R_SENSE 0.11f
