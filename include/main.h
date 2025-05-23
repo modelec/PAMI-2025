@@ -39,7 +39,7 @@ enum Direction
 
 // Paramètres moteurs
 #define R_SENSE 0.11f
-#define CURRENT 600 // mA
+#define CURRENT 800 // mA
 // Adresses des drivers TMC2209
 #define DRIVER1_ADDR 0b00
 #define DRIVER2_ADDR 0b01

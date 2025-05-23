@@ -210,9 +210,12 @@ void setup()
   driver1.en_spreadCycle(false);
   driver2.en_spreadCycle(false);
 
+  driver1.pwm_autoscale(true);
+  driver2.pwm_autoscale(true);
+
   stopMotors();
-  moveAsyncSteps(500, 200, false);
-  // rotateAsync(90, 200, true);
+  moveAsyncSteps(500, 1000, false);
+  // rotateAsync(90, 1000, true);
   Serial.println("Setup complete");
 }
 
