@@ -34,6 +34,15 @@ void disableDrivers()
   digitalWrite(M2_ENABLE_PIN, HIGH);
 }
 
+int getStepsForDistance(float cm)
+{
+  /*
+  float circumference = 3.1416 * WHEEL_DIAMETER;
+  float steps_per_cm = (STEPS_PER_REV * 16) / circumference;
+  */
+  return cm * 740; // Valeur calculée à la main pour une vitesse de 5000 :)
+}
+
 // Arrêt des moteurs
 void stopMotors()
 {
@@ -90,9 +99,9 @@ void updateSteppers()
     {
       digitalWrite(M1_STEP_PIN, HIGH);
       digitalWrite(M2_STEP_PIN, HIGH);
-      delayMicroseconds(2);
       digitalWrite(M1_STEP_PIN, LOW);
       digitalWrite(M2_STEP_PIN, LOW);
+      delayMicroseconds(2);
 
       last_step_time = now;
       steps_done++;
@@ -214,7 +223,7 @@ void setup()
   driver2.pwm_autoscale(true);
 
   stopMotors();
-  moveAsyncSteps(500, 1000, false);
+  moveAsyncSteps(getStepsForDistance(20), 5000, false);
   // rotateAsync(90, 1000, true);
   Serial.println("Setup complete");
 }
