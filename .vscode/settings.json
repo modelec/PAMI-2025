@@ -1,0 +1,6 @@
+{
+	"cmake.sourceDirectory": "D:/Electronique/ESP32/PAMI-2025/lib/bluepad32/src",
+	"files.associations": {
+		"iterator": "cpp"
+	}
+}

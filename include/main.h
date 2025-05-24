@@ -14,16 +14,31 @@ enum Direction
 #define TX_PIN 17
 #define RX_PIN 16
 
-/* Réel */
+// PINs réels
+#ifndef SIMULATOR
+
+// Moteur 1 - Gauche
 #define M1_DIR_PIN 18
 #define M1_STEP_PIN 22
 #define M1_ENABLE_PIN 32
 
+// Moteur 2 - Droite
 #define M2_DIR_PIN 19
 #define M2_STEP_PIN 23
 #define M2_ENABLE_PIN 26
 
-/* Simulateur
+// Capteur à ultrasons
+#define TRIG_PIN 14
+#define ECHO_PIN 15
+
+// Capteur de chute
+#define FALL_TRIG_PIN 12
+#define FALL_ECHO_PIN 13
+
+#endif
+
+// PINs pour le simulateur
+#ifdef SIMULATOR
 
 // Moteur 1 - Gauche
 #define M1_DIR_PIN 4
@@ -35,7 +50,15 @@ enum Direction
 #define M2_STEP_PIN 32
 #define M2_ENABLE_PIN 27
 
-*/
+// Capteur à ultrasons
+#define TRIG_PIN 18
+#define ECHO_PIN 5
+
+// Capteur de chute
+#define FALL_TRIG_PIN 17
+#define FALL_ECHO_PIN 15
+
+#endif
 
 // Paramètres moteurs
 #define R_SENSE 0.11f
@@ -43,10 +66,6 @@ enum Direction
 // Adresses des drivers TMC2209
 #define DRIVER1_ADDR 0b00
 #define DRIVER2_ADDR 0b01
-
-// Capteur à ultrasons
-#define TRIG_PIN 18
-#define ECHO_PIN 5
 
 // Constantes pour les roues
 #define WHEEL_DIAMETER 5.5     // cm

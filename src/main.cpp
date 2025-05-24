@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include <TMCStepper.h>
 
+#define SIMULATOR // Commenter cette ligne pour utiliser le matériel réel
 // Définitions des constantes dans main.h
 #include "main.h"
 
@@ -129,16 +130,29 @@ const int obstacleCheckInterval = 100; // ms between distance checks
 unsigned long lastObstacleCheckTime = 0;
 const int obstacleThresholdCM = 20; // stop if closer than 20 cm
 
-long readDistanceCM()
+long readDistanceCM(uint8_t trigPin, uint8_t echoPin)
 {
-  digitalWrite(TRIG_PIN, LOW);
+  digitalWrite(trigPin, LOW);
   delayMicroseconds(2);
-  digitalWrite(TRIG_PIN, HIGH);
+  digitalWrite(trigPin, HIGH);
   delayMicroseconds(10);
-  digitalWrite(TRIG_PIN, LOW);
-  long duration = pulseIn(ECHO_PIN, HIGH, 20000); // timeout 20 ms
+  digitalWrite(trigPin, LOW);
+  long duration = pulseIn(echoPin, HIGH, 20000); // timeout 20 ms
   long distance = duration * 0.034 / 2;
   return distance;
+}
+
+// Vérification de la distance du sol pour éviter les chutes
+void checkFall()
+{
+  long fallDistance = readDistanceCM(FALL_TRIG_PIN, FALL_ECHO_PIN);
+  // On a fini notre chemin si on arrive en bout de table (détection de distance du sol si plus de 5 cm)
+  if (fallDistance > 5.0 && movementInProgress)
+  {
+    stopMotors();
+    movementInProgress = false;
+    Serial.println("Bout de table détecté : Arrêt");
+  }
 }
 
 void detectObstacles()
@@ -149,13 +163,16 @@ void detectObstacles()
   {
     lastObstacleCheckTime = now;
 
+    // On regarde la distance du sol
+    checkFall();
+
     // Si le robot tourne sur lui-même, on ne vérifie pas les obstacles
     if (lastDirection == RIGHT || lastDirection == LEFT)
     {
       return;
     }
 
-    long distance = readDistanceCM();
+    long distance = readDistanceCM(TRIG_PIN, ECHO_PIN);
 
     if (distance > 0 && distance < obstacleThresholdCM)
     {
@@ -203,6 +220,9 @@ void setup()
   // Capteur à ultrasons
   pinMode(TRIG_PIN, OUTPUT);
   pinMode(ECHO_PIN, INPUT);
+  // Capteur de chute
+  pinMode(FALL_TRIG_PIN, OUTPUT);
+  pinMode(FALL_ECHO_PIN, INPUT);
 
   digitalWrite(M1_ENABLE_PIN, LOW);
   digitalWrite(M2_ENABLE_PIN, LOW);
