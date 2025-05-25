@@ -10,6 +10,19 @@ enum Direction
     STOP
 };
 
+enum StepType
+{
+    STEP_FORWARD,
+    STEP_ROTATE,
+    STEP_FORWARD_UNTIL_FALL
+};
+
+struct Step
+{
+    StepType type;
+    float value; // cm pour STEP_FORWARD, deg pour ROTATE, ignoré pour UNTIL_FALL
+};
+
 // UART
 #define TX_PIN 17
 #define RX_PIN 16
