@@ -1,16 +1,8 @@
 #include <Arduino.h>
-#include <TMCStepper.h>
-
-#define SIMULATOR // Commenter cette ligne pour utiliser le matériel réel
-// Définitions des constantes dans main.h
+// #define SIMULATOR // Commenter cette ligne pour utiliser le matériel réel
+//   Définitions des constantes dans main.h
 #include "main.h"
 #include "utils.h"
-
-// UART (bus unique)
-HardwareSerial TMCSerial(1);
-
-TMC2209Stepper driver1(&TMCSerial, R_SENSE, DRIVER1_ADDR);
-TMC2209Stepper driver2(&TMCSerial, R_SENSE, DRIVER2_ADDR);
 
 volatile int32_t speed_steps_per_sec = 0; // target speed (signed)
 uint32_t last_step_time = 0;
@@ -26,8 +18,9 @@ bool movementInProgress = false;
 // Chaque étape du scénario
 Step scenario[] = {
     {STEP_FORWARD, 20},
-    {STEP_ROTATE, 90},
-    {STEP_FORWARD_UNTIL_FALL, 0}};
+    // {STEP_ROTATE, 90},
+    // {STEP_FORWARD_UNTIL_FALL, 0}
+};
 const int scenarioLength = sizeof(scenario) / sizeof(Step);
 int currentScenarioStep = 0;
 bool scenarioInProgress = false;
@@ -42,7 +35,6 @@ void stopMotors()
 void setup()
 {
   Serial.begin(115200);
-  TMCSerial.begin(115200, SERIAL_8N1, RX_PIN, TX_PIN);
 
   pinMode(M1_STEP_PIN, OUTPUT);
   pinMode(M1_DIR_PIN, OUTPUT);
@@ -54,27 +46,9 @@ void setup()
   pinMode(TRIG_PIN, OUTPUT);
   pinMode(ECHO_PIN, INPUT);
   // Capteur de chute
-  pinMode(FALL_TRIG_PIN, OUTPUT);
-  pinMode(FALL_ECHO_PIN, INPUT);
+  pinMode(FALL_PIN, INPUT);
 
-  digitalWrite(M1_ENABLE_PIN, LOW);
-  digitalWrite(M2_ENABLE_PIN, LOW);
-
-  driver1.begin();
-  driver2.begin();
-
-  driver1.rms_current(CURRENT);
-  driver2.rms_current(CURRENT);
-
-  driver1.microsteps(16);
-  driver2.microsteps(16);
-
-  driver1.en_spreadCycle(false);
-  driver2.en_spreadCycle(false);
-
-  driver1.pwm_autoscale(true);
-  driver2.pwm_autoscale(true);
-
+  enableDrivers();
   stopMotors();
 
   scenarioInProgress = true;
@@ -125,27 +99,28 @@ void updateSteppers()
 {
   uint32_t now = micros();
 
-  // Moteurs
+  // Moteur 1
   if (speed_steps_per_sec != 0 && (steps_done < steps_target))
   {
-    uint32_t interval = 1000000UL / abs(speed_steps_per_sec);
-    if (now - last_step_time >= interval)
+    uint32_t interval1 = 1000000UL / abs(speed_steps_per_sec);
+    static uint32_t last_step_time1 = 0;
+    if (now - last_step_time1 >= interval1)
     {
+
       digitalWrite(M1_STEP_PIN, HIGH);
       digitalWrite(M2_STEP_PIN, HIGH);
+      delayMicroseconds(2); // Short pulse width for step signal
       digitalWrite(M1_STEP_PIN, LOW);
       digitalWrite(M2_STEP_PIN, LOW);
-      delayMicroseconds(2);
-
-      last_step_time = now;
+      last_step_time1 = now;
       steps_done++;
     }
   }
 
-  // Fin du mouvement ?
-  if (movementInProgress &&
-      steps_done >= steps_target)
+  // Comptage des pas (on considère le moteur le plus lent pour terminer l'étape)
+  if (movementInProgress && steps_done >= steps_target)
   {
+
     stopMotors();
     movementInProgress = false;
     Serial.println("Etape terminé");
@@ -178,9 +153,8 @@ long readDistanceCM(uint8_t trigPin, uint8_t echoPin)
 // Vérification de la distance du sol pour éviter les chutes
 void checkFall()
 {
-  long fallDistance = readDistanceCM(FALL_TRIG_PIN, FALL_ECHO_PIN);
-  // On a fini notre chemin si on arrive en bout de table (détection de distance du sol si plus de 5 cm)
-  if (fallDistance > 5.0 && movementInProgress)
+  // On a fini notre chemin si on arrive en bout de table (détection de distance du sol)
+  if (digitalRead(FALL_PIN) == HIGH && movementInProgress)
   {
     stopMotors();
     movementInProgress = false;
@@ -196,8 +170,10 @@ void detectObstacles()
   {
     lastObstacleCheckTime = now;
 
+#ifndef SIMULATOR
     // On regarde la distance du sol
     checkFall();
+#endif
 
     // Si le robot tourne sur lui-même, on ne vérifie pas les obstacles
     if (lastDirection == RIGHT || lastDirection == LEFT)
@@ -273,6 +249,7 @@ void processScenario()
 
 void loop()
 {
+
   updateSteppers(); // Mise à jour des moteurs asynchrone
 
   detectObstacles(); // Vérification des obstacles

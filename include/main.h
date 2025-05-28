@@ -36,19 +36,21 @@ struct Step
 #define M1_ENABLE_PIN 32
 
 // Moteur 2 - Droite
-#define M2_DIR_PIN 19
-#define M2_STEP_PIN 23
-#define M2_ENABLE_PIN 26
+#define M2_DIR_PIN 21
+#define M2_STEP_PIN 25
+#define M2_ENABLE_PIN 27
 
 // Capteur à ultrasons
-#define TRIG_PIN 14
-#define ECHO_PIN 15
+#define TRIG_PIN 15
+#define ECHO_PIN 14
 
 // Capteur de chute
-#define FALL_TRIG_PIN 12
-#define FALL_ECHO_PIN 13
+#define FALL_PIN 13
 
 #endif
+
+// Le moteur 1 est en 32 microsteps, le moteur 2 est en 64 microsteps
+#define MOTOR_MULTIPLIER 2 // Pour ajuster la vitesse des moteurs car ils ont des microsteps différents
 
 // PINs pour le simulateur
 #ifdef SIMULATOR
@@ -68,8 +70,7 @@ struct Step
 #define ECHO_PIN 5
 
 // Capteur de chute
-#define FALL_TRIG_PIN 17
-#define FALL_ECHO_PIN 15
+#define FALL_PIN 17
 
 #endif
 
@@ -77,8 +78,8 @@ struct Step
 #define R_SENSE 0.11f
 #define CURRENT 800 // mA
 // Adresses des drivers TMC2209
-#define DRIVER1_ADDR 0b00
-#define DRIVER2_ADDR 0b01
+#define DRIVER1_ADDR 0b01
+#define DRIVER2_ADDR 0b10
 
 // Constantes pour les roues
 #define WHEEL_DIAMETER 5.5     // cm

@@ -54,21 +54,6 @@
 			"top": 163.2,
 			"left": -19.2,
 			"attrs": { "text": "Obstacles" }
-		},
-		{
-			"type": "wokwi-hc-sr04",
-			"id": "ultrasonic2",
-			"top": 470.9,
-			"left": -357.9,
-			"rotate": 180,
-			"attrs": {}
-		},
-		{
-			"type": "wokwi-text",
-			"id": "text2",
-			"top": 508.8,
-			"left": -182.4,
-			"attrs": { "text": "Capteur de chutes" }
 		}
 	],
 	"connections": [
@@ -91,9 +76,7 @@
 		["esp:16", "drv1:DIR", "blue", ["v9.6", "h144"]],
 		["esp:4", "drv3:DIR", "blue", ["v19.2", "h-57.6", "v-201.6"]],
 		["ultrasonic1:TRIG", "esp:18", "violet", ["v76.8", "h-221.2"]],
-		["ultrasonic1:ECHO", "esp:5", "violet", ["v86.4", "h-240.8"]],
-		["esp:15", "ultrasonic2:ECHO", "cyan", ["v0"]],
-		["esp:17", "ultrasonic2:TRIG", "cyan", ["v115.2", "h-38.4"]]
+		["ultrasonic1:ECHO", "esp:5", "violet", ["v86.4", "h-240.8"]]
 	],
 	"dependencies": {}
 }
