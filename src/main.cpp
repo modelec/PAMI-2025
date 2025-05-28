@@ -5,7 +5,7 @@
 #include "utils.h"
 
 // Côté bleu = 1 et Côté jaune = 2
-#define PAMI_SIDE 2
+#define PAMI_SIDE 1
 
 volatile int32_t speed_steps_per_sec = 0; // target speed (signed)
 uint32_t last_step_time = 0;
@@ -20,6 +20,7 @@ bool movementInProgress = false;
 
 // Chaque étape du scénario
 Step scenario[] = {
+    {STEP_ROTATE, PAMI_SIDE == 1 ? -1 : 1},
     {STEP_FORWARD, 105},
     {STEP_ROTATE, PAMI_SIDE == 1 ? -90 : 90}, // Tourner à gauche si côté bleu, droite si jaune
     {STEP_FORWARD_UNTIL_END, 27}};
@@ -231,13 +232,13 @@ void detectObstacles()
   }
 }
 
-// On gère le scénario du robot
-void processScenario()
+// On gère le scénario du robot, retourne 0 si le scénario est terminé, 1 si en cours
+int processScenario()
 {
   if (!scenarioInProgress)
-    return;
+    return 1;
   if (movementInProgress)
-    return;
+    return 1;
 
   // Si on est en phase de recherche de place
   if (recherchePlace)
@@ -268,14 +269,14 @@ void processScenario()
       recherchePlace = false;
       rechercheStep = 0;
     }
-    return;
+    return 1;
   }
 
   if (currentScenarioStep >= scenarioLength)
   {
     Serial.println("Scénario terminé !");
     scenarioInProgress = false;
-    return;
+    return 0;
   }
 
   Step &step = scenario[currentScenarioStep];
@@ -295,6 +296,8 @@ void processScenario()
     break;
   }
   currentScenarioStep++;
+
+  return 1;
 }
 bool tirettePose = false;
 void loop()
@@ -316,7 +319,15 @@ void loop()
 
       detectObstacles(); // Vérification des obstacles
 
-      processScenario(); // Gestion du scénario
+      // Gestion du scénario
+      if (processScenario() == 0)
+      {
+        Serial.println("Scénario terminé, arrêt des moteurs.");
+        stopMotors();
+        // On redémarre le robot pour recommencer la partie
+        ESP.restart();
+        break;
+      };
     }
   }
 }
