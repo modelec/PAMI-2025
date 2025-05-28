@@ -14,7 +14,7 @@ enum StepType
 {
     STEP_FORWARD,
     STEP_ROTATE,
-    STEP_FORWARD_UNTIL_FALL
+    STEP_FORWARD_UNTIL_END
 };
 
 struct Step

@@ -4,6 +4,9 @@
 #include "main.h"
 #include "utils.h"
 
+// Côté bleu = 1 et Côté jaune = 2
+#define PAMI_SIDE 1
+
 volatile int32_t speed_steps_per_sec = 0; // target speed (signed)
 uint32_t last_step_time = 0;
 
@@ -17,10 +20,9 @@ bool movementInProgress = false;
 
 // Chaque étape du scénario
 Step scenario[] = {
-    //{STEP_FORWARD, 20},
-    {STEP_ROTATE, 90},
-    // {STEP_FORWARD_UNTIL_FALL, 0}
-};
+    {STEP_FORWARD, 30},
+    {STEP_ROTATE, PAMI_SIDE == 1 ? -90 : 90}, // Tourner à gauche si côté bleu, droite si jaune
+    {STEP_FORWARD_UNTIL_END, 30}};
 const int scenarioLength = sizeof(scenario) / sizeof(Step);
 int currentScenarioStep = 0;
 bool scenarioInProgress = false;
@@ -130,7 +132,7 @@ bool isMoving()
 // Capteur à ultrasons
 const int obstacleCheckInterval = 100; // ms between distance checks
 unsigned long lastObstacleCheckTime = 0;
-const int obstacleThresholdCM = 20; // stop if closer than 20 cm
+const int obstacleThresholdCM = 7; // stop if closer than 7 cm
 
 long readDistanceCM(uint8_t trigPin, uint8_t echoPin)
 {
@@ -156,45 +158,52 @@ void checkFall()
   }
 }
 
+bool recherchePlace = false;
+int rechercheStep = 0;
+// Nombre de pas restants à faire après la reprise de place
+int stepsRemainingPlace = 0;
+
+// Sous-scénario pour la recherche de place
+const int NB_RECHERCHE_STEPS = 3;
+Step rechercheScenario[NB_RECHERCHE_STEPS] = {
+    {STEP_FORWARD, 20},
+    {STEP_ROTATE, PAMI_SIDE == 1 ? -90 : 90}};
+
 void detectObstacles()
 {
-  // On vérifie les obstacles
   unsigned long now = millis();
   if (now - lastObstacleCheckTime >= obstacleCheckInterval)
   {
     lastObstacleCheckTime = now;
-
 #ifndef SIMULATOR
-    // On regarde la distance du sol
     checkFall();
 #endif
-
-    // Si le robot tourne sur lui-même, on ne vérifie pas les obstacles
     if (lastDirection == RIGHT || lastDirection == LEFT)
     {
       return;
     }
-
     long distance = readDistanceCM(TRIG_PIN, ECHO_PIN);
-
     if (distance > 0 && distance < obstacleThresholdCM)
     {
-      // Si un obstacle est détecté, on arrête le robot
       if (isMoving())
       {
         lastSpeed = speed_steps_per_sec;
         stopMotors();
         Serial.println("Obstacle détecté : Arrêt");
-
-        // On recherche une place
-        if (currentScenarioStep == STEP_FORWARD_UNTIL_FALL)
+        // Si on est dans STEP_FORWARD_UNTIL_END, on lance la recherche de place
+        if (scenarioInProgress && currentScenarioStep > 0 && scenario[currentScenarioStep - 1].type == STEP_FORWARD_UNTIL_END && !recherchePlace)
         {
+          recherchePlace = true;
+          rechercheStep = 0;
+          stepsRemainingPlace = steps_target - steps_done; // On garde en mémoire les pas restants
+          Serial.println("Début recherche de place...");
+          // On tourne pour éviter le robot adverse
+          rotateAsync(PAMI_SIDE == 1 ? 90 : -90, 1000, true); // Tourner à gauche si côté bleu, droite si jaune
         }
       }
     }
     else
     {
-      // Si le robot est arrêté et qu'il n'y a pas d'obstacle, on reprend le mouvement
       if (!isMoving() && movementInProgress)
       {
         switch (lastDirection)
@@ -220,7 +229,39 @@ void processScenario()
   if (!scenarioInProgress)
     return;
   if (movementInProgress)
-    return; // On attend la fin du mouvement
+    return;
+
+  // Si on est en phase de recherche de place
+  if (recherchePlace)
+  {
+    if (rechercheStep < NB_RECHERCHE_STEPS)
+    {
+      Step &step = rechercheScenario[rechercheStep];
+      switch (step.type)
+      {
+      case STEP_FORWARD:
+        moveAsyncSteps(getStepsForDistance(step.value), 2500, true);
+        break;
+      case STEP_ROTATE:
+        if (step.value >= 0)
+          rotateAsync(step.value, 1000, true);
+        else
+          rotateAsync(-step.value, 1000, false);
+        break;
+      default:
+        break;
+      }
+      rechercheStep++;
+    }
+    else
+    {
+      // Après le sous-scénario, on tente d'avancer à nouveau
+      moveAsyncSteps(stepsRemainingPlace, 2500, true);
+      recherchePlace = false;
+      rechercheStep = 0;
+    }
+    return;
+  }
 
   if (currentScenarioStep >= scenarioLength)
   {
@@ -236,11 +277,13 @@ void processScenario()
     moveAsyncSteps(getStepsForDistance(step.value), 2500, true);
     break;
   case STEP_ROTATE:
-    rotateAsync(step.value, 1000, true);
+    if (step.value >= 0)
+      rotateAsync(step.value, 1000, true);
+    else
+      rotateAsync(-step.value, 1000, false);
     break;
-  case STEP_FORWARD_UNTIL_FALL:
-    // On lance un mouvement très long, on s'arrêtera à la détection de chute
-    moveAsyncSteps(getStepsForDistance(200), 1000, true); // 200cm = "infini"
+  case STEP_FORWARD_UNTIL_END:
+    moveAsyncSteps(getStepsForDistance(step.value), 2500, true);
     break;
   }
   currentScenarioStep++;
