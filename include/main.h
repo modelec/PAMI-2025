@@ -31,9 +31,9 @@ struct Step
 #ifndef SIMULATOR
 
 // Moteur 1 - Gauche
-#define M1_DIR_PIN 18
-#define M1_STEP_PIN 22
-#define M1_ENABLE_PIN 32
+#define M1_DIR_PIN 19
+#define M1_STEP_PIN 23
+#define M1_ENABLE_PIN 26
 
 // Moteur 2 - Droite
 #define M2_DIR_PIN 21
@@ -81,9 +81,10 @@ struct Step
 #define DRIVER1_ADDR 0b01
 #define DRIVER2_ADDR 0b10
 
-// Constantes pour les roues
-#define WHEEL_DIAMETER 5.5     // cm
-#define STEPS_PER_REV 200 * 16 // microsteps
-#define WHEEL_BASE 7.2         // cm
+// Constantes
+#define WHEEL_DIAMETER 5.5 // cm
+#define WHEEL_BASE 7.2     // cm
+#define STEPS_PER_REV 200.0
+#define MICROSTEPPING 8.0
 
 #endif // MAIN_H

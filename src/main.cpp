@@ -1,6 +1,6 @@
 #include <Arduino.h>
 // #define SIMULATOR // Commenter cette ligne pour utiliser le matériel réel
-//   Définitions des constantes dans main.h
+//     Définitions des constantes dans main.h
 #include "main.h"
 #include "utils.h"
 
@@ -17,8 +17,8 @@ bool movementInProgress = false;
 
 // Chaque étape du scénario
 Step scenario[] = {
-    {STEP_FORWARD, 20},
-    // {STEP_ROTATE, 90},
+    //{STEP_FORWARD, 20},
+    {STEP_ROTATE, 90},
     // {STEP_FORWARD_UNTIL_FALL, 0}
 };
 const int scenarioLength = sizeof(scenario) / sizeof(Step);
@@ -74,15 +74,9 @@ void moveAsyncSteps(int32_t steps, int32_t speed, bool forwardDir)
 
 void rotateAsync(float angleDeg, int32_t speed, bool toRight)
 {
-  // Informations sur les roues
-  const float wheelCirc = PI * WHEEL_DIAMETER;
-
-  float rotationCirc = PI * WHEEL_BASE;
-  float distPerWheel = (angleDeg / 360.0) * rotationCirc;
-  int32_t steps = (distPerWheel / wheelCirc) * STEPS_PER_REV;
 
   // Le nombre de pas à faire
-  steps_target = steps;
+  steps_target = getRotationSteps(angleDeg + 4.0); // 4.0 correspond à une correction trouvée à la main :)
   steps_done = 0;
 
   // La direction du moteur
@@ -191,6 +185,11 @@ void detectObstacles()
         lastSpeed = speed_steps_per_sec;
         stopMotors();
         Serial.println("Obstacle détecté : Arrêt");
+
+        // On recherche une place
+        if (currentScenarioStep == STEP_FORWARD_UNTIL_FALL)
+        {
+        }
       }
     }
     else
@@ -234,14 +233,14 @@ void processScenario()
   switch (step.type)
   {
   case STEP_FORWARD:
-    moveAsyncSteps(getStepsForDistance(step.value), 5000, true);
+    moveAsyncSteps(getStepsForDistance(step.value), 2500, true);
     break;
   case STEP_ROTATE:
     rotateAsync(step.value, 1000, true);
     break;
   case STEP_FORWARD_UNTIL_FALL:
     // On lance un mouvement très long, on s'arrêtera à la détection de chute
-    moveAsyncSteps(getStepsForDistance(200), 5000, true); // 200cm = "infini"
+    moveAsyncSteps(getStepsForDistance(200), 1000, true); // 200cm = "infini"
     break;
   }
   currentScenarioStep++;

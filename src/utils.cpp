@@ -1,6 +1,6 @@
-#include "main.h"
-#include "utils.h"
 #include <Arduino.h>
+#include "utils.h"
+#include "main.h"
 
 void enableDrivers()
 {
@@ -16,9 +16,21 @@ void disableDrivers()
 
 int getStepsForDistance(float cm)
 {
-    /*
-    float circumference = 3.1416 * WHEEL_DIAMETER;
-    float steps_per_cm = (STEPS_PER_REV * 16) / circumference;
-    */
-    return cm * 740; // Valeur calculée à la main pour une vitesse de 5000 :)
+    double wheel_circumference_cm = M_PI * (double)WHEEL_DIAMETER;
+    double steps_per_cm = ((double)STEPS_PER_REV * (double)MICROSTEPPING) / wheel_circumference_cm;
+    int total_steps = (int)round(cm * steps_per_cm);
+    int correction = (int)round(1.5 * steps_per_cm);
+
+    return total_steps - correction;
+    // return cm * 740; // Valeur calculée à la main pour une vitesse de 5000 :)
+}
+
+int getRotationSteps(float angleDeg)
+{
+
+    double wheelTurnPerRotation = (double)WHEEL_BASE / (double)WHEEL_DIAMETER;
+    double microStepsPerRotation = wheelTurnPerRotation * (double)STEPS_PER_REV * (double)MICROSTEPPING;
+    double microStepsForAngle = microStepsPerRotation * (angleDeg / 360.0);
+
+    return (int)round(microStepsForAngle);
 }
