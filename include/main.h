@@ -27,6 +27,8 @@ struct Step
 #define TX_PIN 17
 #define RX_PIN 16
 
+#define TIRETTE_PIN 4
+
 // PINs réels
 #ifndef SIMULATOR
 

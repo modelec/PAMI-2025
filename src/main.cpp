@@ -5,7 +5,7 @@
 #include "utils.h"
 
 // Côté bleu = 1 et Côté jaune = 2
-#define PAMI_SIDE 1
+#define PAMI_SIDE 2
 
 volatile int32_t speed_steps_per_sec = 0; // target speed (signed)
 uint32_t last_step_time = 0;
@@ -20,9 +20,9 @@ bool movementInProgress = false;
 
 // Chaque étape du scénario
 Step scenario[] = {
-    {STEP_FORWARD, 30},
+    {STEP_FORWARD, 105},
     {STEP_ROTATE, PAMI_SIDE == 1 ? -90 : 90}, // Tourner à gauche si côté bleu, droite si jaune
-    {STEP_FORWARD_UNTIL_END, 30}};
+    {STEP_FORWARD_UNTIL_END, 27}};
 const int scenarioLength = sizeof(scenario) / sizeof(Step);
 int currentScenarioStep = 0;
 bool scenarioInProgress = false;
@@ -44,6 +44,7 @@ void setup()
   pinMode(M2_STEP_PIN, OUTPUT);
   pinMode(M2_DIR_PIN, OUTPUT);
   pinMode(M2_ENABLE_PIN, OUTPUT);
+  pinMode(TIRETTE_PIN, INPUT_PULLUP);
   // Capteur à ultrasons
   pinMode(TRIG_PIN, OUTPUT);
   pinMode(ECHO_PIN, INPUT);
@@ -78,7 +79,7 @@ void rotateAsync(float angleDeg, int32_t speed, bool toRight)
 {
 
   // Le nombre de pas à faire
-  steps_target = getRotationSteps(angleDeg + 4.0); // 4.0 correspond à une correction trouvée à la main :)
+  steps_target = getRotationSteps(angleDeg + 10.0); // 10.0 correspond à une correction trouvée à la main :)
   steps_done = 0;
 
   // La direction du moteur
@@ -198,7 +199,14 @@ void detectObstacles()
           stepsRemainingPlace = steps_target - steps_done; // On garde en mémoire les pas restants
           Serial.println("Début recherche de place...");
           // On tourne pour éviter le robot adverse
-          rotateAsync(PAMI_SIDE == 1 ? 90 : -90, 1000, true); // Tourner à gauche si côté bleu, droite si jaune
+          if (PAMI_SIDE == 1)
+          {
+            rotateAsync(90, 1000, true); // Tourner à droite si côté bleu
+          }
+          else
+          {
+            rotateAsync(90, 1000, false); // Tourner à gauche si côté jaune
+          }
         }
       }
     }
@@ -288,13 +296,27 @@ void processScenario()
   }
   currentScenarioStep++;
 }
-
+bool tirettePose = false;
 void loop()
 {
 
-  updateSteppers(); // Mise à jour des moteurs asynchrone
+  if (digitalRead(TIRETTE_PIN) == LOW && !tirettePose)
+  {
+    // Tirette posée
+    tirettePose = true;
+  }
 
-  detectObstacles(); // Vérification des obstacles
+  else if (digitalRead(TIRETTE_PIN) == HIGH && tirettePose)
+  {
+    // Tirette activée
+    delay(5000);
+    while (true)
+    {
+      updateSteppers(); // Mise à jour des moteurs asynchrone
 
-  processScenario(); // Gestion du scénario
+      detectObstacles(); // Vérification des obstacles
+
+      processScenario(); // Gestion du scénario
+    }
+  }
 }
