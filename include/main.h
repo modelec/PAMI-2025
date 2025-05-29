@@ -14,13 +14,15 @@ enum StepType
 {
     STEP_FORWARD,
     STEP_ROTATE,
-    STEP_FORWARD_UNTIL_END
+    STEP_FORWARD_UNTIL_END,
+    STEP_BACKWARD
 };
 
 struct Step
 {
     StepType type;
-    float value; // cm pour STEP_FORWARD, deg pour ROTATE, ignoré pour UNTIL_FALL
+    float value;   // cm pour STEP_FORWARD, deg pour ROTATE, ignoré pour UNTIL_FALL
+    int32_t speed; // Vitesse en pas / seconde
 };
 
 // UART
@@ -48,6 +50,8 @@ struct Step
 
 // Capteur de chute
 #define FALL_PIN 13
+
+#define SERVO_PIN 33
 
 #endif
 

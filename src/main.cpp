@@ -6,6 +6,8 @@
 
 // Côté bleu = 1 et Côté jaune = 2
 #define PAMI_SIDE 1
+// Numéro du pami pour les différents robots car chemins différents
+#define PAMI_NUM 2
 
 volatile int32_t speed_steps_per_sec = 0; // target speed (signed)
 uint32_t last_step_time = 0;
@@ -18,12 +20,33 @@ volatile int32_t steps_target = 0;
 volatile int32_t steps_done = 0;
 bool movementInProgress = false;
 
-// Chaque étape du scénario
+// Les différents scénario possibles: le superstar et les autres
+// #if PAMI_NUM == 1
+// // Chaque étape du scénario
+// Step scenario[] = {
+//     {STEP_FORWARD, 105, 2500},
+//     {STEP_ROTATE, PAMI_SIDE == 1 ? -90 : 90, 1000}, // Tourner à gauche si côté bleu, droite si jaune
+//     {STEP_FORWARD_UNTIL_END, 50, 2500}};
+// #else
+// Step scenario[] = {
+//     {STEP_FORWARD, 45, 3000},
+//     {STEP_ROTATE, PAMI_SIDE == 1 ? -90 : 90, 1000},
+//     {STEP_FORWARD, 30, 3000},
+//     {STEP_ROTATE, PAMI_SIDE == 1 ? 90 : -90, 1000},
+//     {STEP_FORWARD, 65 + 10 * (4 - PAMI_NUM), 3000},
+//     {STEP_ROTATE, PAMI_SIDE == 1 ? -90 : 90, 1000},
+// #if PAMI_NUM > 2
+//     {STEP_BACKWARD, 10 * PAMI_NUM, 500}
+// #endif
+
+// };
+// #endif
+
+// Homologation
 Step scenario[] = {
-    {STEP_ROTATE, PAMI_SIDE == 1 ? -1 : 1},
-    {STEP_FORWARD, 105},
-    {STEP_ROTATE, PAMI_SIDE == 1 ? -90 : 90}, // Tourner à gauche si côté bleu, droite si jaune
-    {STEP_FORWARD_UNTIL_END, 27}};
+    {STEP_FORWARD, 105, 2500},
+};
+
 const int scenarioLength = sizeof(scenario) / sizeof(Step);
 int currentScenarioStep = 0;
 bool scenarioInProgress = false;
@@ -33,6 +56,13 @@ void stopMotors()
 {
   speed_steps_per_sec = 0;
 }
+
+// Servo moteur
+const int angleCentre = 90;                 // Position centrale
+const int amplitude = 10;                   // Amplitude de mouvement
+const unsigned long intervalleServo = 1000; // Intervalle en millisecondes
+unsigned long tempsServoPrecedent = 0;
+bool directionServo = true; // true = vers le haut, false = vers le bas
 
 // Fonction d'initialisation
 void setup()
@@ -51,6 +81,9 @@ void setup()
   pinMode(ECHO_PIN, INPUT);
   // Capteur de chute
   pinMode(FALL_PIN, INPUT);
+
+  // Servo moteur
+  pinMode(SERVO_PIN, OUTPUT);
 
   enableDrivers();
   stopMotors();
@@ -156,6 +189,7 @@ void checkFall()
   {
     stopMotors();
     movementInProgress = false;
+    scenarioInProgress = false;
     Serial.println("Bout de table détecté : Arrêt");
   }
 }
@@ -178,7 +212,11 @@ void detectObstacles()
   {
     lastObstacleCheckTime = now;
 #ifndef SIMULATOR
-    checkFall();
+    // On vérifie si on est en train de tomber seulement dans la phase finale
+    if (PAMI_NUM == 1 && currentScenarioStep > 1)
+    {
+      checkFall();
+    }
 #endif
     if (lastDirection == RIGHT || lastDirection == LEFT)
     {
@@ -236,7 +274,7 @@ void detectObstacles()
 int processScenario()
 {
   if (!scenarioInProgress)
-    return 1;
+    return 0;
   if (movementInProgress)
     return 1;
 
@@ -249,7 +287,7 @@ int processScenario()
       switch (step.type)
       {
       case STEP_FORWARD:
-        moveAsyncSteps(getStepsForDistance(step.value), 2500, true);
+        moveAsyncSteps(getStepsForDistance(step.value), step.speed, true);
         break;
       case STEP_ROTATE:
         if (step.value >= 0)
@@ -283,22 +321,26 @@ int processScenario()
   switch (step.type)
   {
   case STEP_FORWARD:
-    moveAsyncSteps(getStepsForDistance(step.value), 2500, true);
+    moveAsyncSteps(getStepsForDistance(step.value), step.speed, true);
+    break;
+  case STEP_BACKWARD:
+    moveAsyncSteps(getStepsForDistance(step.value), step.speed, false);
     break;
   case STEP_ROTATE:
     if (step.value >= 0)
-      rotateAsync(step.value, 1000, true);
+      rotateAsync(step.value, step.speed, true);
     else
-      rotateAsync(-step.value, 1000, false);
+      rotateAsync(-step.value, step.speed, false);
     break;
   case STEP_FORWARD_UNTIL_END:
-    moveAsyncSteps(getStepsForDistance(step.value), 2500, true);
+    moveAsyncSteps(getStepsForDistance(step.value), step.speed, true);
     break;
   }
   currentScenarioStep++;
 
   return 1;
 }
+
 bool tirettePose = false;
 void loop()
 {
