@@ -51,7 +51,8 @@ struct Step
 // Capteur de chute
 #define FALL_PIN 13
 
-#define SERVO_PIN 33
+#define SERVO_PIN 12
+#define EMG_PIN 2
 
 #endif
 
