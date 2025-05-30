@@ -52,7 +52,7 @@ struct Step
 #define FALL_PIN 13
 
 #define SERVO_PIN 12
-#define EMG_PIN 2
+#define EMG_PIN 5
 
 #endif
 

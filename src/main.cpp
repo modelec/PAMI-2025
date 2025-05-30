@@ -5,9 +5,9 @@
 #include "utils.h"
 
 // Côté bleu = 1 et Côté jaune = 2
-#define PAMI_SIDE 2
+#define PAMI_SIDE 1
 // Numéro du pami pour les différents robots car chemins différents
-#define PAMI_NUM 2
+#define PAMI_NUM 4
 #define START_DELAY 5000
 
 uint32_t startTime = 0;
@@ -34,10 +34,11 @@ Step scenario[] = {
 Step scenario[] = {
     {STEP_FORWARD, 35, 2500},
     {STEP_ROTATE, PAMI_SIDE == 1 ? -45 + 10 * (PAMI_NUM - 2) : 45 - 10 * (PAMI_NUM - 2), 500},
-    {STEP_FORWARD, 140 - 15 * PAMI_NUM, 3000},
+    {STEP_FORWARD, 80 - 10 * PAMI_NUM, 3000},
     {STEP_ROTATE, PAMI_SIDE == 1 ? 45 - 10 * (PAMI_NUM - 2) : -45 + 10 * (PAMI_NUM - 2), 500},
+    {STEP_FORWARD, 60 - 10 * PAMI_NUM, 3000},
     {STEP_ROTATE, PAMI_SIDE == 1 ? -90 : 90, 500},
-    {STEP_BACKWARD, 100 - 15 * PAMI_NUM, 1000}};
+    {STEP_BACKWARD, 50 - 10 * PAMI_NUM, 1000}};
 #endif
 
 const int scenarioLength = sizeof(scenario) / sizeof(Step);
@@ -76,7 +77,7 @@ void setup()
   pinMode(FALL_PIN, INPUT);
 
   // Servo moteur
-  //pinMode(SERVO_PIN, OUTPUT);
+  // pinMode(SERVO_PIN, OUTPUT);
 
   ledcSetup(0, 50, 16);
   ledcAttachPin(SERVO_PIN, 0);
@@ -379,8 +380,12 @@ void loop()
         Serial.println("Scénario terminé, arrêt des moteurs.");
         stopMotors();
         uint32_t duty;
-        while(true) {
-          if(digitalRead(EMG_PIN)){
+
+        while (true)
+        {
+
+          if (!digitalRead(EMG_PIN))
+          {
             duty = (uint32_t)((pow(2, 16) - 1) * 0.05);
             ledcWrite(0, duty);
             delay(500);
@@ -388,10 +393,12 @@ void loop()
             ledcWrite(0, duty);
             delay(500);
           }
+          else
+          {
+            ESP.restart();
+            break;
+          }
         }
-        // On redémarre le robot pour recommencer la partie
-        ESP.restart();
-        break;
       };
     }
   }
