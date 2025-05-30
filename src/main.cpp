@@ -5,9 +5,9 @@
 #include "utils.h"
 
 // Côté bleu = 1 et Côté jaune = 2
-#define PAMI_SIDE 1
+#define PAMI_SIDE 2
 // Numéro du pami pour les différents robots car chemins différents
-#define PAMI_NUM 3
+#define PAMI_NUM 2
 #define START_DELAY 5000
 
 uint32_t startTime = 0;
@@ -29,16 +29,15 @@ bool movementInProgress = false;
 Step scenario[] = {
     {STEP_FORWARD, 105, 2500},
     {STEP_ROTATE, PAMI_SIDE == 1 ? -90 : 90, 1000}, // Tourner à gauche si côté bleu, droite si jaune
-    {STEP_FORWARD_UNTIL_END, 50, 2500}};
+    {STEP_FORWARD_UNTIL_END, 50, 2000}};
 #else
 Step scenario[] = {
-    {STEP_FORWARD, 40, 2500},
-    {STEP_ROTATE, PAMI_SIDE == 1 ? -90 : 90, 1000},
-    {STEP_FORWARD, 35, 3000},
-    {STEP_ROTATE, PAMI_SIDE == 1 ? 90 : -90, 1000},
-    {STEP_FORWARD, 75 + 10 * (4 - PAMI_NUM), 2500},
-    {STEP_ROTATE, PAMI_SIDE == 1 ? -90 : 90, 1000},
-    {STEP_BACKWARD, 10 + 10 * PAMI_SIDE, 500}};
+    {STEP_FORWARD, 35, 2500},
+    {STEP_ROTATE, PAMI_SIDE == 1 ? -45 + 10 * (PAMI_NUM - 2) : 45 - 10 * (PAMI_NUM - 2), 500},
+    {STEP_FORWARD, 130 - 15 * PAMI_NUM, 3000},
+    {STEP_ROTATE, PAMI_SIDE == 1 ? 45 - 10 * (PAMI_NUM - 2) : -45 + 10 * (PAMI_NUM - 2), 500},
+    {STEP_ROTATE, PAMI_SIDE == 1 ? -90 : 90, 500},
+    {STEP_BACKWARD, 100 - 15 * PAMI_NUM, 500}};
 #endif
 
 const int scenarioLength = sizeof(scenario) / sizeof(Step);
@@ -242,7 +241,7 @@ void detectObstacles()
           }
         }
         // Si les PAMIs du bas arrivent sur leur phase finale et détecte un robot, alors on s'arrête et se met en position finale
-        if (PAMI_NUM > 1 && currentScenarioStep == 4)
+        if (PAMI_NUM > 1 && currentScenarioStep == 2)
         {
           recherchePlace = true;
           Serial.println("Début recherche de place...");
@@ -361,7 +360,7 @@ void loop()
   else if (digitalRead(TIRETTE_PIN) == HIGH && tirettePose)
   {
     // Tirette activée
-    uint32_t startDelay = START_DELAY + (PAMI_NUM - 1) * 3000;
+    uint32_t startDelay = START_DELAY + (PAMI_NUM - 1) * 2000;
     delay(startDelay);
     uint32_t startTime = millis();
 
