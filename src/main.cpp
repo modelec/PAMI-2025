@@ -61,7 +61,7 @@ bool directionServo = true; // true = vers le haut, false = vers le bas
 void setup()
 {
   Serial.begin(115200);
-
+  pinMode(EMG_PIN, INPUT);
   pinMode(M1_STEP_PIN, OUTPUT);
   pinMode(M1_DIR_PIN, OUTPUT);
   pinMode(M1_ENABLE_PIN, OUTPUT);
@@ -76,7 +76,10 @@ void setup()
   pinMode(FALL_PIN, INPUT);
 
   // Servo moteur
-  pinMode(SERVO_PIN, OUTPUT);
+  //pinMode(SERVO_PIN, OUTPUT);
+
+  ledcSetup(0, 50, 16);
+  ledcAttachPin(SERVO_PIN, 0);
 
   enableDrivers();
   stopMotors();
@@ -375,6 +378,17 @@ void loop()
       {
         Serial.println("Scénario terminé, arrêt des moteurs.");
         stopMotors();
+        uint32_t duty;
+        while(true) {
+          if(digitalRead(EMG_PIN)){
+            duty = (uint32_t)((pow(2, 16) - 1) * 0.05);
+            ledcWrite(0, duty);
+            delay(500);
+            duty = (uint32_t)((pow(2, 16) - 1) * 0.1);
+            ledcWrite(0, duty);
+            delay(500);
+          }
+        }
         // On redémarre le robot pour recommencer la partie
         ESP.restart();
         break;
