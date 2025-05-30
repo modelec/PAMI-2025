@@ -7,7 +7,8 @@
 // Côté bleu = 1 et Côté jaune = 2
 #define PAMI_SIDE 1
 // Numéro du pami pour les différents robots car chemins différents
-#define PAMI_NUM 2
+#define PAMI_NUM 3
+#define START_DELAY 5000
 
 uint32_t startTime = 0;
 
@@ -31,17 +32,13 @@ Step scenario[] = {
     {STEP_FORWARD_UNTIL_END, 50, 2500}};
 #else
 Step scenario[] = {
-    {STEP_FORWARD, 45, 3000},
+    {STEP_FORWARD, 40, 2500},
     {STEP_ROTATE, PAMI_SIDE == 1 ? -90 : 90, 1000},
-    {STEP_FORWARD, 30, 3000},
+    {STEP_FORWARD, 35, 3000},
     {STEP_ROTATE, PAMI_SIDE == 1 ? 90 : -90, 1000},
-    {STEP_FORWARD, 65 + 10 * (4 - PAMI_NUM), 3000},
+    {STEP_FORWARD, 75 + 10 * (4 - PAMI_NUM), 2500},
     {STEP_ROTATE, PAMI_SIDE == 1 ? -90 : 90, 1000},
-#if PAMI_NUM > 2
-    {STEP_BACKWARD, 10 * PAMI_NUM, 500}
-#endif
-
-};
+    {STEP_BACKWARD, 10 + 10 * PAMI_SIDE, 500}};
 #endif
 
 const int scenarioLength = sizeof(scenario) / sizeof(Step);
@@ -244,6 +241,12 @@ void detectObstacles()
             rotateAsync(90, 1000, false); // Tourner à gauche si côté jaune
           }
         }
+        // Si les PAMIs du bas arrivent sur leur phase finale et détecte un robot, alors on s'arrête et se met en position finale
+        if (PAMI_NUM > 1 && currentScenarioStep == 4)
+        {
+          recherchePlace = true;
+          Serial.println("Début recherche de place...");
+        }
       }
     }
     else
@@ -278,7 +281,14 @@ int processScenario()
   // Si on est en phase de recherche de place
   if (recherchePlace)
   {
-    if (rechercheStep < NB_RECHERCHE_STEPS)
+    // Les Pamis du bas
+    if (PAMI_NUM > 1)
+    {
+      currentScenarioStep++;
+      recherchePlace = false;
+    }
+    // PAMI superstar du haut
+    else if (rechercheStep < NB_RECHERCHE_STEPS)
     {
       Step &step = rechercheScenario[rechercheStep];
       switch (step.type)
@@ -351,7 +361,7 @@ void loop()
   else if (digitalRead(TIRETTE_PIN) == HIGH && tirettePose)
   {
     // Tirette activée
-    uint32_t startDelay = 85000 + (PAMI_NUM - 1) * 3;
+    uint32_t startDelay = START_DELAY + (PAMI_NUM - 1) * 3000;
     delay(startDelay);
     uint32_t startTime = millis();
 
