@@ -34,10 +34,10 @@ Step scenario[] = {
 Step scenario[] = {
     {STEP_FORWARD, 35, 2500},
     {STEP_ROTATE, PAMI_SIDE == 1 ? -45 + 10 * (PAMI_NUM - 2) : 45 - 10 * (PAMI_NUM - 2), 500},
-    {STEP_FORWARD, 130 - 15 * PAMI_NUM, 3000},
+    {STEP_FORWARD, 140 - 15 * PAMI_NUM, 3000},
     {STEP_ROTATE, PAMI_SIDE == 1 ? 45 - 10 * (PAMI_NUM - 2) : -45 + 10 * (PAMI_NUM - 2), 500},
     {STEP_ROTATE, PAMI_SIDE == 1 ? -90 : 90, 500},
-    {STEP_BACKWARD, 100 - 15 * PAMI_NUM, 500}};
+    {STEP_BACKWARD, 100 - 15 * PAMI_NUM, 1000}};
 #endif
 
 const int scenarioLength = sizeof(scenario) / sizeof(Step);
