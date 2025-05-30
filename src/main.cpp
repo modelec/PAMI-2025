@@ -9,6 +9,8 @@
 // Numéro du pami pour les différents robots car chemins différents
 #define PAMI_NUM 2
 
+uint32_t startTime = 0;
+
 volatile int32_t speed_steps_per_sec = 0; // target speed (signed)
 uint32_t last_step_time = 0;
 
@@ -20,32 +22,27 @@ volatile int32_t steps_target = 0;
 volatile int32_t steps_done = 0;
 bool movementInProgress = false;
 
-// Les différents scénario possibles: le superstar et les autres
-// #if PAMI_NUM == 1
-// // Chaque étape du scénario
-// Step scenario[] = {
-//     {STEP_FORWARD, 105, 2500},
-//     {STEP_ROTATE, PAMI_SIDE == 1 ? -90 : 90, 1000}, // Tourner à gauche si côté bleu, droite si jaune
-//     {STEP_FORWARD_UNTIL_END, 50, 2500}};
-// #else
-// Step scenario[] = {
-//     {STEP_FORWARD, 45, 3000},
-//     {STEP_ROTATE, PAMI_SIDE == 1 ? -90 : 90, 1000},
-//     {STEP_FORWARD, 30, 3000},
-//     {STEP_ROTATE, PAMI_SIDE == 1 ? 90 : -90, 1000},
-//     {STEP_FORWARD, 65 + 10 * (4 - PAMI_NUM), 3000},
-//     {STEP_ROTATE, PAMI_SIDE == 1 ? -90 : 90, 1000},
-// #if PAMI_NUM > 2
-//     {STEP_BACKWARD, 10 * PAMI_NUM, 500}
-// #endif
-
-// };
-// #endif
-
-// Homologation
+// Les différents scénario possibles : le superstar et les autres
+#if PAMI_NUM == 1
+// Chaque étape du scénario
 Step scenario[] = {
     {STEP_FORWARD, 105, 2500},
+    {STEP_ROTATE, PAMI_SIDE == 1 ? -90 : 90, 1000}, // Tourner à gauche si côté bleu, droite si jaune
+    {STEP_FORWARD_UNTIL_END, 50, 2500}};
+#else
+Step scenario[] = {
+    {STEP_FORWARD, 45, 3000},
+    {STEP_ROTATE, PAMI_SIDE == 1 ? -90 : 90, 1000},
+    {STEP_FORWARD, 30, 3000},
+    {STEP_ROTATE, PAMI_SIDE == 1 ? 90 : -90, 1000},
+    {STEP_FORWARD, 65 + 10 * (4 - PAMI_NUM), 3000},
+    {STEP_ROTATE, PAMI_SIDE == 1 ? -90 : 90, 1000},
+#if PAMI_NUM > 2
+    {STEP_BACKWARD, 10 * PAMI_NUM, 500}
+#endif
+
 };
+#endif
 
 const int scenarioLength = sizeof(scenario) / sizeof(Step);
 int currentScenarioStep = 0;
@@ -354,15 +351,18 @@ void loop()
   else if (digitalRead(TIRETTE_PIN) == HIGH && tirettePose)
   {
     // Tirette activée
-    delay(5000);
+    uint32_t startDelay = 85000 + (PAMI_NUM - 1) * 3;
+    delay(startDelay);
+    uint32_t startTime = millis();
+
     while (true)
     {
       updateSteppers(); // Mise à jour des moteurs asynchrone
 
       detectObstacles(); // Vérification des obstacles
 
-      // Gestion du scénario
-      if (processScenario() == 0)
+      // Gestion du scénario puis arrêt si terminé ou si temps dépassé
+      if (processScenario() == 0 || millis() - startTime >= 100000 - startDelay)
       {
         Serial.println("Scénario terminé, arrêt des moteurs.");
         stopMotors();
